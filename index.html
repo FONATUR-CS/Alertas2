@@ -166,7 +166,7 @@
             </button>
           </div>
           <div
-            class="p-10 font-news text-lg leading-relaxed whitespace-pre-wrap"
+            class="p-10 font-news text-lg leading-relaxed whitespace-pre-wrap max-h-[60vh] overflow-y-auto"
           >
             <div id="alert-content"></div>
           </div>
@@ -185,8 +185,17 @@
         <input
           type="password"
           id="api-key-input"
-          class="w-full bg-black border border-gray-700 p-3 rounded text-sm text-white mb-4 outline-none"
+          class="w-full bg-black border border-gray-700 p-3 rounded text-sm text-white mb-2 outline-none"
         />
+        <p class="text-[10px] text-gray-500 mb-4">
+          Consigue tu llave aquí:
+          <a
+            href="https://aistudio.google.com/app/apikey"
+            target="_blank"
+            class="text-[#bd9751] hover:underline"
+            >Google AI Studio</a
+          >
+        </p>
         <button
           id="btn-save-key"
           class="w-full bg-[#bd9751] text-black py-2 rounded font-bold text-xs uppercase"
