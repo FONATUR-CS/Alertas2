@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+
 
 // === VARIABLES Y ESTADO ===
 let mediaRecorder = null;
@@ -18,6 +18,9 @@ const apiModal = document.getElementById("api-modal");
 const apiKeyInput = document.getElementById("api-key-input");
 const historyList = document.getElementById("history-list");
 
+
+
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // === CORE: PROCESAMIENTO ===
 async function processAudio(blob, fileName = "Audio Institucional") {
@@ -43,12 +46,9 @@ async function processAudio(blob, fileName = "Audio Institucional") {
 
     // Convertir blob a base64
     const base64Audio = await blobToBase64(blob);
-    const base64Data = base64Audio.split(",")[1]; // Remover el prefijo data:audio/...;base64,
+    const base64Data = base64Audio.split(",")[1];
 
     updateProgress(30, "Preparando modelo...");
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-    updateProgress(50, "Gemini analizando audio...");
 
     const prompt = `ACTÚA COMO: Redactor/a senior de Comunicación Social de FONATUR. 
 OBJETIVO: Escuchar el audio y generar una "Alerta de Prensa" fidedigna. 
@@ -63,15 +63,8 @@ ${systemDateFormatted}
 [Cuerpo máx 4 párrafos]
 [Cierre]`;
 
-    const result = await model.generateContentStream([
-      {
-        inlineData: {
-          mimeType: blob.type || "audio/mpeg",
-          data: base64Data,
-        },
-      },
-      { text: prompt },
-    ]);
+    // Intentar con reintentos y fallback
+    const result = await retryWithFallback(genAI, base64Data, blob.type, prompt);
 
     updateProgress(70, "Generando redacción institucional...");
 
@@ -93,6 +86,64 @@ ${systemDateFormatted}
     setLoading(false);
   }
 }
+
+// Reintentos con exponential backoff y fallback a modelo alternativo
+async function retryWithFallback(genAI, base64Data, mimeType, prompt) {
+  const models = ["gemini-3-pro-preview", "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"];
+  const maxRetries = 3;
+
+  for (const modelName of models) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        updateProgress(50, `Conectando a ${modelName} (intento ${attempt})...`);
+        const model = genAI.getGenerativeModel({ model: modelName });
+
+        const result = await model.generateContentStream([
+          {
+            inlineData: {
+              mimeType: mimeType || "audio/mpeg",
+              data: base64Data,
+            },
+          },
+          { text: prompt },
+        ]);
+
+        return result; // Éxito
+      } catch (err) {
+        const msg = err.message || "";
+        const is503 = msg.includes("503") || msg.toLowerCase().includes("overloaded");
+        const is429 = msg.includes("429") || msg.toLowerCase().includes("quota") || msg.toLowerCase().includes("limit");
+
+        // Si es error de cuota (429), saltar INMEDIATAMENTE al siguiente modelo
+        if (is429) {
+            console.warn(`Cuota excedida en ${modelName}, cambiando de modelo...`);
+            updateProgress(50, `Cuota excedida en ${modelName}, probando siguiente...`);
+            break; // Rompe el loop de intentos, pasa al siguiente modelo
+        }
+
+        // Si es error de servidor (503), reintentar con espera
+        if (is503) {
+            if (attempt < maxRetries) {
+                const waitTime = Math.pow(2, attempt) * 1000;
+                updateProgress(50, `${modelName} saturado, reintentando en ${waitTime/1000}s...`);
+                await new Promise(r => setTimeout(r, waitTime));
+                continue;
+            } else {
+                // Si se acabaron los intentos para este modelo, pasar al siguiente
+                updateProgress(50, `${modelName} no responde, buscando alternativa...`);
+                break;
+            }
+        }
+
+        // Otros errores graves: lanzar excepción
+        throw err;
+      }
+    }
+  }
+
+  throw new Error("No se pudo completar la transcripción con ningún modelo disponible.");
+}
+
 
 // Helper: Convertir blob a base64
 function blobToBase64(blob) {
