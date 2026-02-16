@@ -53,7 +53,7 @@ async function processAudio(blob, fileName = "Audio Institucional") {
     const prompt = `ACTÚA COMO: Redactor/a senior de Comunicación Social de FONATUR. 
 OBJETIVO: Escuchar el audio y generar una "Alerta de Prensa" fidedigna. 
 REGLAS: Sin Markdown (solo asteriscos en encabezado/titular). FECHA: ${systemDateFormatted}.
-PRINCIPIOS: Lealtad absoluta al audio, incertidumbre = omisión.
+PRINCIPIOS: Lealtad absoluta al audio, escribir en orden cronológico, sin incertidumbre, sin inventar nada que no venga en audio.
 ESTILO: Formal e institucional.
 CONTEXTO: ${trainingContext}
 ESTRUCTURA:
